@@ -10,11 +10,13 @@ package org.csource.fastdfs;
 
 import org.csource.common.IniFileReader;
 import org.csource.common.MyException;
+import org.csource.init.FdfsClientSetting;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.security.InvalidParameterException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -113,6 +115,40 @@ public class ClientGlobal {
       g_secret_key = iniReader.getStrValue("http.secret_key");
     }
   }
+    static void checkNotNull(String key, Object o){
+         if(o==null){
+             throw new RuntimeException(String.format("fdfsClient config :%s should not be null !",key));
+         }
+    }
+
+    /**
+     * 通过config代替配置文件
+     * @param setting
+     */
+    public static void initOfConfig(FdfsClientSetting setting) {
+        String[] szTrackerServers;
+        String[] parts;
+        g_connect_timeout = setting.getConnectTimeout(DEFAULT_CONNECT_TIMEOUT)*1000;
+        g_network_timeout = setting.getNetworkTimeout(DEFAULT_NETWORK_TIMEOUT)*1000;
+        g_charset = setting.getCharset(DEFAULT_CHARSET);
+
+        checkNotNull("tracker_server", setting.getTrackerServers());
+        szTrackerServers = setting.getTrackerServers();
+        InetSocketAddress[] trackerServers = new InetSocketAddress[szTrackerServers.length];
+        for (int i = 0; i < szTrackerServers.length; i++) {
+            parts = szTrackerServers[i].split(":", 2);
+            if (parts.length != 2) {
+                throw new InvalidParameterException("the value of item \"tracker_server\" is invalid, the correct format is host:port");
+            }
+            trackerServers[i] = new InetSocketAddress(parts[0].trim(), Integer.parseInt(parts[1].trim()));
+        }
+        g_tracker_group = new TrackerGroup(trackerServers);
+        g_tracker_http_port = setting.getTrackerHttpPort(80);
+        g_anti_steal_token = setting.isAntiStealToken();
+        if (g_anti_steal_token) {
+            g_secret_key = setting.getSecretKey();
+        }
+    }
 
   /**
    * load from properties file
